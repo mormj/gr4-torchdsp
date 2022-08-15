@@ -13,6 +13,9 @@ py3_inst = import('python').find_installation('python3')
 pybind11_dep = dependency('pybind11', required : get_option('enable_python'))
 json_dep = dependency('nlohmann_json')
 
+triton_dep = dependency('TritonClient', modules: ['TritonClient::httpclient'], method: 'cmake')
+
+
 prefix = get_option('prefix')
 # Escape spaces
 prefix_parts = prefix.split(' ')

@@ -1,5 +1,8 @@
-torchdsp_sources += []
-torchdsp_deps += [gnuradio_gr_dep, volk_dep, fmt_dep, pmtf_dep, python3_embed_dep, json_dep]
+torchdsp_sources += [
+    'triton_model_impl.cc',
+    'shm_utils.cc'
+]
+torchdsp_deps += [gnuradio_gr_dep, volk_dep, fmt_dep, pmtf_dep, python3_embed_dep, json_dep, triton_dep]
 
 block_cpp_args = ['-DHAVE_CPU']
 
