@@ -1,0 +1,68 @@
+module: torchdsp
+block: triton_block
+label: triton_block
+blocktype: sync_block
+
+# Example Parameters
+parameters:
+    - id: triton_url
+      label: Triton URL
+      dtype: string
+      grc:
+        default: "localhost:8000"
+    - id: model_name
+      label: Model Name
+      dtype: string
+      grc:
+        default: "simple"
+    - id: input_shape
+      label: Input Shape
+      dtype: size
+      container: vector
+      grc:
+        default: (1, 16)
+    - id: input_vlen
+      label: Number of Input Elements
+      dtype: size
+      default: 2
+      cotr: false
+    - id: output_shape
+      label: Output Shape
+      dtype: size
+      container: vector
+      grc:
+        default: (1, 1)
+    - id: output_vlen
+      label: Number of Output Elements
+      dtype: int
+      grc:
+        default: 1
+      cotr: false
+
+    - id: itemsize
+      label: Item Size
+      dtype: size_t
+      settable: false
+      default: 0
+      grc:
+          hide: part
+
+# Example Ports
+ports:
+    - domain: stream
+      id: in
+      direction: input
+      type: untyped
+      size: parameters/itemsize
+
+    - domain: stream
+      id: out
+      direction: output
+      type: untyped
+      size: parameters/itemsize
+
+implementations:
+    - id: cpu
+# -   id: cuda
+
+file_format: 1
