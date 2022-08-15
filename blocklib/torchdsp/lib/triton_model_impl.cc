@@ -381,8 +381,8 @@ void triton_model_impl::infer(
 }
 
 void triton_model_impl::infer_batch(
-    std::vector<const char*> in_buffers,
-    std::vector<char*> out_buffers,
+    std::vector<const char*>& in_buffers,
+    std::vector<char*>& out_buffers,
     size_t batch_size) {
 
     for (uint16_t idx = 0; idx < in_buffers.size(); idx++)

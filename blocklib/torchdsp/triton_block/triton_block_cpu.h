@@ -11,6 +11,7 @@
 #pragma once
 
 #include <gnuradio/torchdsp/triton_block.h>
+#include <gnuradio/torchdsp/triton_model.h>
 
 namespace gr {
 namespace torchdsp {
@@ -22,7 +23,7 @@ public:
     work_return_t work(work_io& wio) override;
 
 private:
-    // private variables here
+    std::unique_ptr<triton_model> model_;
 };
 
 } // namespace torchdsp

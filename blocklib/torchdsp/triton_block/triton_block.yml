@@ -9,18 +9,18 @@ parameters:
       label: Triton URL
       dtype: string
       grc:
-        default: "localhost:8000"
+          default: "localhost:8000"
     - id: model_name
       label: Model Name
       dtype: string
       grc:
-        default: "simple"
+          default: "simple"
     - id: input_shape
       label: Input Shape
       dtype: size
       container: vector
       grc:
-        default: (1, 16)
+          default: (1, 16)
     - id: input_vlen
       label: Number of Input Elements
       dtype: size
@@ -31,14 +31,17 @@ parameters:
       dtype: size
       container: vector
       grc:
-        default: (1, 1)
+          default: (1, 1)
     - id: output_vlen
       label: Number of Output Elements
       dtype: int
       grc:
-        default: 1
+          default: 1
       cotr: false
-
+    - id: max_batch_size
+      label: "Max Batch Size"
+      dtype: int
+      default: 256
     - id: itemsize
       label: Item Size
       dtype: size_t

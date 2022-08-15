@@ -37,8 +37,8 @@ public:
     virtual std::vector<int> get_output_signature() = 0;
     virtual void infer(std::vector<const char*> in, std::vector<char*> out) = 0;
     virtual void infer_batch(
-        std::vector<const char*> in,
-        std::vector<char*> out,
+        std::vector<const char*>& in,
+        std::vector<char*>& out,
         size_t batch_size) = 0;
 
     /*!
