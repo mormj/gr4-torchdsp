@@ -1,0 +1,53 @@
+module: torchdsp
+block: add
+label: add
+blocktype: grc
+
+typekeys:
+  - id: T
+    type: class
+    options: 
+        - cf32
+        - rf32
+        # - ri32
+        # - ri16
+        # - ri8
+
+grc:
+    templates:
+        imports: from gnuradio import torchdsp
+        make: torchdsp.triton_block(2, 1, "${"add_cpu_openvino" if device == 'cpu' else "add_gpu"}", ${max_batch_size}, ${triton_url}, [], [])
+
+# Example Parameters
+parameters:
+- id: triton_url
+  label: "Triton URL"
+  dtype: string
+  default: "localhost:8000"
+- id: device
+  label: "Device"
+  dtype: string
+  default: "cpu"
+- id: max_batch_size
+  label: "Max Batch Size"
+  dtype: size
+  default: 256
+
+# Example Ports
+ports:
+-   domain: stream
+    id: in
+    direction: input
+    type: typekeys/T
+    multiplicity: "2"
+
+-   domain: stream
+    id: out
+    direction: output
+    type: typekeys/T
+
+implementations:
+-   id: cpu
+# -   id: cuda
+
+file_format: 1

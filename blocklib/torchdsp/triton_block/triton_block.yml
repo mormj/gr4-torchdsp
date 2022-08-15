@@ -5,46 +5,47 @@ blocktype: sync_block
 
 # Example Parameters
 parameters:
-    - id: triton_url
-      label: Triton URL
-      dtype: string
+    - id: num_in
+      label: Number of Inputs
+      dtype: size
       grc:
-          default: "localhost:8000"
+          default: 1
+    - id: num_out
+      label: Number of Outputs
+      dtype: size
+      grc:
+          default: 1
     - id: model_name
       label: Model Name
       dtype: string
       grc:
           default: "simple"
+    - id: max_batch_size
+      label: "Max Batch Size"
+      dtype: size
+      grc:  
+        default: 256
+    - id: triton_url
+      label: Triton URL
+      dtype: string
+      grc:
+          default: "localhost:8000"
     - id: input_shape
       label: Input Shape
       dtype: size
       container: vector
       grc:
           default: (1, 16)
-    - id: input_vlen
-      label: Number of Input Elements
-      dtype: size
-      default: 2
-      cotr: false
     - id: output_shape
       label: Output Shape
       dtype: size
       container: vector
       grc:
           default: (1, 1)
-    - id: output_vlen
-      label: Number of Output Elements
-      dtype: int
-      grc:
-          default: 1
-      cotr: false
-    - id: max_batch_size
-      label: "Max Batch Size"
-      dtype: int
-      default: 256
+
     - id: itemsize
       label: Item Size
-      dtype: size_t
+      dtype: size
       settable: false
       default: 0
       grc:
@@ -57,12 +58,14 @@ ports:
       direction: input
       type: untyped
       size: parameters/itemsize
+      multiplicity: parameters/num_in
 
     - domain: stream
       id: out
       direction: output
       type: untyped
       size: parameters/itemsize
+      multiplicity: parameters/num_out
 
 implementations:
     - id: cpu

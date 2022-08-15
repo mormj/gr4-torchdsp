@@ -144,3 +144,13 @@ core
 # Archives
 *.tar.gz
 *.zip
+
+
+.devcontainer/
+*.pkl
+*.pt
+*.ckpt
+examples/lightning_logs/
+*.f32
+*.ipynb
+.vscode/
