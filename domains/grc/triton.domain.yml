@@ -1,0 +1,14 @@
+id: triton
+label: Triton
+color: "#ce5fc7"
+
+multiple_connections_per_input: false
+multiple_connections_per_output: true
+
+templates:
+-   type: [triton, triton]
+    connect: self.connect(${ make_port_sig(source) }, ${ make_port_sig(sink) }).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+-   type: [triton, cpu]
+    connect: self.connect(${ make_port_sig(source) }, ${ make_port_sig(sink) }).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+-   type: [cpu, triton]
+    connect: self.connect(${ make_port_sig(source) }, ${ make_port_sig(sink) }).set_custom_buffer(torchdsp.buffer_triton_properties.make())

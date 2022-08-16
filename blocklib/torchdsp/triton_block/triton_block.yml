@@ -69,6 +69,7 @@ ports:
 
 implementations:
     - id: cpu
+      domain: triton
 # -   id: cuda
 
 file_format: 1

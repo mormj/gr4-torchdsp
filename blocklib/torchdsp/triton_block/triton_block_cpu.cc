@@ -11,6 +11,8 @@
 #include "triton_block_cpu.h"
 #include "triton_block_cpu_gen.h"
 
+#include <gnuradio/torchdsp/buffer_triton.h>
+
 namespace gr {
 namespace torchdsp {
 
@@ -30,20 +32,36 @@ work_return_t triton_block_cpu::work(work_io& wio)
 
     auto noutput_items = wio.outputs()[0].n_items;
 
-    std::vector<const char*> in_ptrs;
-    for (const auto& item : wio.inputs())
-        in_ptrs.push_back(item.items<char>());
+    auto in1 = wio.inputs()[0].items<float>();
+    auto in2 = wio.inputs()[1].items<float>();
+    auto out = wio.outputs()[0].items<float>();
+
+    std::vector<buffer_triton_reader*> in_bufs;
+    for (auto& w : wio.inputs()) {
+        auto p_buf = w.bufp();
+        in_bufs.push_back(static_cast<buffer_triton_reader*>(p_buf));
+    }
 
 
-    std::vector<char*> out_ptrs;
-    for (const auto& item : wio.outputs())
-        out_ptrs.push_back(item.items<char>());
+    std::vector<buffer_triton*> out_bufs;
+    for (auto& w : wio.outputs()) {
+        auto p_buf = w.bufp();
+        out_bufs.push_back(static_cast<buffer_triton*>(p_buf));
+    }
 
     // num_items_per_patch is fixed.
     auto num_items_per_batch =
         model_.get()->get_output_sizes()[0] / model_.get()->get_output_signature()[0];
     auto batch_size = noutput_items / num_items_per_batch;
-    model_->infer_batch(in_ptrs, out_ptrs, batch_size);
+
+    model_->infer_batch_zerocopy(in_bufs, out_bufs, batch_size);
+
+    for (int i=0; i<10; i++)
+    {
+        std::cout << ((float *)out_bufs[0]->write_ptr())[i] << std::endl;
+        
+    }
+
 
     wio.produce_each(noutput_items);
     return work_return_t::OK;

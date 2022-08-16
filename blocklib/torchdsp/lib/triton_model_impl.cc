@@ -258,18 +258,18 @@ triton_model_impl::io_memory_t triton_model_impl::allocate_shm(
     static unsigned int segment_number = 0;
 
     int shm_fd_ip;
-    void* data_ptr;
+    void* data_ptr = (void *)0x12345678;
     std::string shm_key =
         std::string("/gr_") + io_meta.name + std::to_string(segment_number);
     size_t num_bytes =
         num_elements(io_meta.shape) * itemsize(io_meta.datatype) * max_batch_size;
 
-    tc::Error error = tc::CreateSharedMemoryRegion(shm_key, num_bytes, &shm_fd_ip);
-    tc::MapSharedMemory(shm_fd_ip, 0, num_bytes, (void**)&data_ptr);
-    tc::CloseSharedMemory(shm_fd_ip);
+    // tc::Error error = tc::CreateSharedMemoryRegion(shm_key, num_bytes, &shm_fd_ip);
+    // tc::MapSharedMemory(shm_fd_ip, 0, num_bytes, (void**)&data_ptr);
+    // tc::CloseSharedMemory(shm_fd_ip);
 
-    if (!error.IsOk())
-        return io_memory_t{ 0, 0, 0, "", 0 };
+    // if (!error.IsOk())
+    //     return io_memory_t{ 0, 0, 0, "", 0 };
 
     segment_number += 1;
     return io_memory_t{ static_cast<size_t>(itemsize(io_meta.datatype)),
@@ -305,11 +305,11 @@ void triton_model_impl::create_triton_input(
         std::to_string(input_number) + std::string("input_") + io_meta.name;
     registered_input_names_.push_back(registered_name);
 
-    client->RegisterSystemSharedMemory(
-        registered_name, io_mem.shm_key, io_mem.element_byte_size * io_mem.batch_size);
+    // client->RegisterSystemSharedMemory(
+    //     registered_name, io_mem.shm_key, io_mem.element_byte_size * io_mem.batch_size);
 
-    input_ptrs_.back()->SetSharedMemory(
-        registered_name, io_mem.element_byte_size * io_mem.batch_size, 0);
+    // input_ptrs_.back()->SetSharedMemory(
+    //     registered_name, io_mem.element_byte_size * io_mem.batch_size, 0);
 
     input_number += 1;
 }
@@ -339,15 +339,15 @@ void triton_model_impl::create_triton_output(
     auto registered_name =
         std::to_string(output_number) + std::string("output_") + io_meta.name;
     registered_output_names_.push_back(registered_name);
-    client->RegisterSystemSharedMemory(
-        std::to_string(output_number) + std::string("output_") + io_meta.name,
-        io_mem.shm_key,
-        io_mem.element_byte_size * io_mem.batch_size);
+    // client->RegisterSystemSharedMemory(
+    //     std::to_string(output_number) + std::string("output_") + io_meta.name,
+    //     io_mem.shm_key,
+    //     io_mem.element_byte_size * io_mem.batch_size);
 
-    output_ptrs_.back()->SetSharedMemory(
-        std::to_string(output_number) + std::string("output_") + io_meta.name,
-        io_mem.element_byte_size * io_mem.batch_size,
-        0);
+    // output_ptrs_.back()->SetSharedMemory(
+    //     std::to_string(output_number) + std::string("output_") + io_meta.name,
+    //     io_mem.element_byte_size * io_mem.batch_size,
+    //     0);
 
     output_number += 1;
 }
@@ -417,6 +417,51 @@ void triton_model_impl::infer_batch(
             out_buffers[idx],
             outputs_[idx].data_ptr,
             outputs_[idx].element_byte_size * batch_size);
+}
+
+
+void triton_model_impl::infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
+                  std::vector<buffer_triton*>& out_buffers,
+                  size_t batch_size) {
+
+    std::vector<tc::InferInput*> inputs;
+    int idx = 0;
+    for (const auto& input_ptr : input_ptrs_) {
+        // We have to modify the shape of the input
+        std::vector<int64_t> new_shape;
+        for (const auto& dim : input_ptr->Shape())
+            new_shape.push_back(dim);
+        new_shape[0] = batch_size; // We just override the first dimension.
+        input_ptr->SetShape(new_shape);
+
+        // void * start_of_buffer = in_buffers[idx]->read_ptr() - in_buffers[idx]->read_index();
+        size_t offset = in_buffers[idx]->read_index();
+
+        //input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(), in_buffers[idx]->items_available()*in_buffers[idx]->item_size(), offset);
+        input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(), in_buffers[idx]->items_available()*in_buffers[idx]->item_size(), offset);
+        inputs.push_back(input_ptr.get());
+        idx++;
+    }
+
+    std::vector<const tc::InferRequestedOutput*> outputs;
+    idx = 0;
+    for (const auto& output_ptr : output_ptrs_) {
+        // void * start_of_buffer = out_buffers[idx]->write_ptr() - out_buffers[idx]->write_index();
+        size_t offset = out_buffers[idx]->write_index();
+        output_ptr->SetSharedMemory(out_buffers[idx]->shm_key(), out_buffers[idx]->space_available()*out_buffers[idx]->item_size(), offset);
+        outputs.push_back(output_ptr.get());
+        idx++;
+    }
+
+    tc::InferResult* result;
+    tc::Error err = client_->Infer(&result, options_, inputs, outputs);
+    if (!err.IsOk()) {
+        std::cout << err << std::endl;
+    }
+
+    for (uint16_t idx = 0; idx < out_buffers.size(); idx++) {
+      std::cout << fmt::format("{}", outputs_[idx].data_ptr) << std::endl;
+                              }
 }
 
 } // namespace torchdsp

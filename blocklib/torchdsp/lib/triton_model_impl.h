@@ -10,6 +10,7 @@
 
 #include "shm_utils.h"
 #include <gnuradio/torchdsp/triton_model.h>
+#include <gnuradio/torchdsp/buffer_triton.h>
 #include <http_client.h>
 #include <rapidjson/document.h>
 
@@ -95,7 +96,9 @@ public:
     void infer_batch(std::vector<const char*>& in_buffers,
                      std::vector<char*>& out_buffers,
                      size_t batch_size);
-
+    void infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
+                  std::vector<buffer_triton*>& out_buffers,
+                  size_t batch_size);
 
     // Interface to Triton Server
     static rapidjson::Document

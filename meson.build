@@ -47,4 +47,5 @@ run_command('python3', join_paths(SCRIPTS_DIR,'gen_meson.py'),
   join_paths(meson.project_source_root(),'blocklib'), check: true)
   
 subdir('blocklib/torchdsp')
+subdir('domains/grc')
 

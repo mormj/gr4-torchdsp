@@ -9,6 +9,7 @@
 #define INCLUDED_TORCHDSP_TRITON_MODEL_H
 
 #include <gnuradio/sync_block.h>
+#include <gnuradio/torchdsp/buffer_triton.h>
 #include <gnuradio/torchdsp/api.h>
 
 namespace gr {
@@ -40,7 +41,9 @@ public:
         std::vector<const char*>& in,
         std::vector<char*>& out,
         size_t batch_size) = 0;
-
+    virtual void infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
+                  std::vector<buffer_triton*>& out_buffers,
+                  size_t batch_size) = 0;
     /*!
      * \brief Return a shared_ptr to a new instance of torchdsp::triton_model.
      *
