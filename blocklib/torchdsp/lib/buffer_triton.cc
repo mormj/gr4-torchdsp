@@ -63,6 +63,8 @@ buffer_triton::buffer_triton(size_t num_items,
 
     std::cout << fmt::format("{}: {}", _shared_memory, _shm_key) << std::endl;
 
+    set_bufp((uint8_t *)_shared_memory);
+
     err =_client->RegisterSystemSharedMemory(
         _shm_key, std::string("/")+_shm_key, _buffer_size);
     std::cout << err << std::endl;

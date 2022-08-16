@@ -219,7 +219,7 @@ blocks:
     alias: ''
     comment: ''
     device: gpu
-    impl: cpu
+    impl: triton
     max_batch_size: '256'
     maxoutbuf: '0'
     minoutbuf: '0'

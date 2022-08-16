@@ -438,6 +438,7 @@ void triton_model_impl::infer_batch_zerocopy(std::vector<buffer_triton_reader*>&
         size_t offset = in_buffers[idx]->read_index();
 
         //input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(), in_buffers[idx]->items_available()*in_buffers[idx]->item_size(), offset);
+        std::cout << "infer: " << in_buffers[idx]->shm_key() << std::endl;
         input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(), in_buffers[idx]->items_available()*in_buffers[idx]->item_size(), offset);
         inputs.push_back(input_ptr.get());
         idx++;
@@ -448,6 +449,7 @@ void triton_model_impl::infer_batch_zerocopy(std::vector<buffer_triton_reader*>&
     for (const auto& output_ptr : output_ptrs_) {
         // void * start_of_buffer = out_buffers[idx]->write_ptr() - out_buffers[idx]->write_index();
         size_t offset = out_buffers[idx]->write_index();
+        std::cout << "infer: " << out_buffers[idx]->shm_key() << std::endl;
         output_ptr->SetSharedMemory(out_buffers[idx]->shm_key(), out_buffers[idx]->space_available()*out_buffers[idx]->item_size(), offset);
         outputs.push_back(output_ptr.get());
         idx++;
