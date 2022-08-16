@@ -16,10 +16,10 @@
 namespace gr {
 namespace torchdsp {
 
-class triton_block_cpu : public virtual triton_block
+class triton_block_triton : public virtual triton_block
 {
 public:
-    triton_block_cpu(block_args args);
+    triton_block_triton(block_args args);
     work_return_t work(work_io& wio) override;
 
 private:

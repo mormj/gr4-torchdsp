@@ -47,7 +47,7 @@ ports:
     type: typekeys/T
 
 implementations:
--   id: cpu
+-   id: triton
 # -   id: cuda
 
 file_format: 1

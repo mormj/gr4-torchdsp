@@ -8,15 +8,15 @@
  *
  */
 
-#include "triton_block_cpu.h"
-#include "triton_block_cpu_gen.h"
+#include "triton_block_triton.h"
+#include "triton_block_triton_gen.h"
 
 #include <gnuradio/torchdsp/buffer_triton.h>
 
 namespace gr {
 namespace torchdsp {
 
-triton_block_cpu::triton_block_cpu(block_args args) : INHERITED_CONSTRUCTORS
+triton_block_triton::triton_block_triton(block_args args) : INHERITED_CONSTRUCTORS
 {
     model_ = triton_model::make(args.model_name, args.max_batch_size, args.triton_url);
     if (model_ == nullptr)
@@ -26,7 +26,7 @@ triton_block_cpu::triton_block_cpu(block_args args) : INHERITED_CONSTRUCTORS
     std::cout << "Instantiated block" << std::endl;
 }
 
-work_return_t triton_block_cpu::work(work_io& wio)
+work_return_t triton_block_triton::work(work_io& wio)
 {
     // std::cout << "Got " << noutput_items << " to produce." << std::endl;
 

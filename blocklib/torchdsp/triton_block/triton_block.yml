@@ -68,8 +68,8 @@ ports:
       multiplicity: parameters/num_out
 
 implementations:
-    - id: cpu
-      domain: triton
+    - id: triton
+      # domain: triton
 # -   id: cuda
 
 file_format: 1

@@ -24,7 +24,7 @@ prefix = '\ '.join(prefix_parts)
 cuda_available = add_languages('cuda', required : false)
 IMPLEMENT_CUDA = cuda_available and get_option('enable_cuda')
 IMPLEMENT_CPU = true
-
+IMPLEMENT_TRITON=true
 ###############################################################################
 # IF Out of Tree Module
 ###############################################################################

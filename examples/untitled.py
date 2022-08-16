@@ -58,10 +58,10 @@ class untitled(gr.flowgraph):
         ##################################################
         # Connections
         ##################################################
-        self.connect((self.analog_sig_source_0, 0), (self.torchdsp_add_0, 0))
-        self.connect((self.analog_sig_source_0_0, 0), (self.torchdsp_add_0, 1))
         self.connect((self.streamops_head_0, 0), (self.snk, 0))
-        self.connect((self.torchdsp_add_0, 0), (self.streamops_head_0, 0))
+        self.connect((self.analog_sig_source_0, 0), (self.torchdsp_add_0, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+        self.connect((self.analog_sig_source_0_0, 0), (self.torchdsp_add_0, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+        self.connect((self.torchdsp_add_0, 0), (self.streamops_head_0, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
 
 
     def get_samp_rate(self):
