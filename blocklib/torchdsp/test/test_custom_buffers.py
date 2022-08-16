@@ -36,7 +36,7 @@ class untitled(gr.flowgraph):
         # Variables
         ##################################################
         self.samp_rate = samp_rate = 32000
-        self.nitems = nitems = 1024
+        self.nitems = nitems = 10240
 
         ##################################################
         # Blocks

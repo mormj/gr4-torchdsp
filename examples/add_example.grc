@@ -37,7 +37,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '1024'
+    value: '80000'
   states:
     bus_sink: false
     bus_source: false
@@ -218,7 +218,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    device: gpu
+    device: cpu_openvino
     impl: triton
     max_batch_size: '256'
     maxoutbuf: '0'

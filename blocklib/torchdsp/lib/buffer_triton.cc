@@ -67,8 +67,9 @@ buffer_triton::buffer_triton(size_t num_items,
 
     err =_client->RegisterSystemSharedMemory(
         _shm_key, std::string("/")+_shm_key, _buffer_size);
-    std::cout << err << std::endl;
+    
     if (!err.IsOk()) {
+        std::cout << err << std::endl;
         throw std::runtime_error("Unable to create Triton Shared Memory Segment");
     }
     

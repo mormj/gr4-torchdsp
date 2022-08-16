@@ -56,11 +56,11 @@ work_return_t triton_block_triton::work(work_io& wio)
 
     model_->infer_batch_zerocopy(in_bufs, out_bufs, batch_size);
 
-    for (int i=0; i<10; i++)
-    {
-        std::cout << ((float *)out_bufs[0]->write_ptr())[i] << std::endl;
+    // for (int i=0; i<10; i++)
+    // {
+    //     std::cout << ((float *)out_bufs[0]->write_ptr())[i] << std::endl;
         
-    }
+    // }
 
 
     wio.produce_each(noutput_items);

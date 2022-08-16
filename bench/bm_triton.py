@@ -49,15 +49,15 @@ class benchmark_copy(gr.top_block):
         self.connect((hd, 0), (snk, 0))
         for idx, blk in enumerate(op_blocks):
             if (idx == 0):
-                self.connect((src, 0), (blk, 0))
+                self.connect((src, 0), (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
             else:
-                self.connect(op_blocks[idx-1], (blk, 0))
+                self.connect(op_blocks[idx-1], (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
 
             ns = blocks.null_source()
-            self.connect((ns, 0), (blk, 1))
+            self.connect((ns, 0), (blk, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
 
 
-        self.connect((op_blocks[num_blocks-1], 0), (hd, 0))
+        self.connect((op_blocks[num_blocks-1], 0), (hd, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
 
 
 def main(top_block_cls=benchmark_copy, options=None):
