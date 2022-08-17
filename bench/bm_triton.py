@@ -11,6 +11,7 @@
 from gnuradio import blocks, streamops
 from gnuradio import torchdsp
 from gnuradio import gr
+from gnuradio.schedulers import nbt
 import sys
 import signal
 from argparse import ArgumentParser
@@ -20,7 +21,7 @@ class benchmark_copy(gr.top_block):
 
     def __init__(self, args):
         gr.top_block.__init__(self, "Benchmark Copy")
-
+        self.blocks = []
         ##################################################
         # Variables
         ##################################################
@@ -37,27 +38,31 @@ class benchmark_copy(gr.top_block):
             op_blocks.append(
                 torchdsp.triton_block(2, 1, f'{args.operation}_{args.device}', args.batch_size, args.addr, [], [])
             )
+        self.blocks.extend(op_blocks)
 
         src = blocks.null_source()
         snk = blocks.null_sink()
         hd = streamops.head(actual_samples, 
             gr.sizeof_float*veclen)
 
+        self.blocks.extend([src,snk,hd])
         ##################################################
         # Connections
         ##################################################
+        buffer_size = args.buffer_size
         self.connect((hd, 0), (snk, 0))
         for idx, blk in enumerate(op_blocks):
             if (idx == 0):
-                self.connect((src, 0), (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+                self.connect((src, 0), (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
             else:
-                self.connect(op_blocks[idx-1], (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+                self.connect(op_blocks[idx-1], (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
 
             ns = blocks.null_source()
-            self.connect((ns, 0), (blk, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+            self.blocks.append(ns)
+            self.connect((ns, 0), (blk, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
 
 
-        self.connect((op_blocks[num_blocks-1], 0), (hd, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+        self.connect((op_blocks[num_blocks-1], 0), (hd, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
 
 
 def main(top_block_cls=benchmark_copy, options=None):
@@ -71,6 +76,8 @@ def main(top_block_cls=benchmark_copy, options=None):
     parser.add_argument('--veclen', type=int, default=1)
     parser.add_argument('--addr', type=str, default='localhost:8000')
     parser.add_argument('--batch-size', type=int, default=256)
+    parser.add_argument('--buffer-size', type=int, default=64000)
+    parser.add_argument('--group', action='store_true')
 
     args = parser.parse_args()
     print(args)
@@ -79,6 +86,7 @@ def main(top_block_cls=benchmark_copy, options=None):
         print("Error: failed to enable real-time scheduling.")
 
     tb = top_block_cls(args)
+    rt = gr.runtime()
 
     def sig_handler(sig=None, frame=None):
         tb.stop()
@@ -88,11 +96,18 @@ def main(top_block_cls=benchmark_copy, options=None):
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
 
+    sched = nbt.scheduler_nbt("sched")
+    if (args.group):
+        sched.add_block_group(tb.blocks)
+
+    rt.add_scheduler(sched)
+
+    rt.initialize(tb)
     print("starting ...")
     startt = time.time()
-    tb.start()
+    rt.start()
 
-    tb.wait()
+    rt.wait()
     endt = time.time()
 
     print(f'[PROFILE_TIME]{endt-startt}[PROFILE_TIME]')
