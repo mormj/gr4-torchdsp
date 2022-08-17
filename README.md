@@ -1,5 +1,7 @@
 # gr-torchdsp
 
+Note: this is a GR 4.0 port of https://github.com/gvanhoy/gr-torchdsp
+
 # Install
 ## Installing TIS Dependencies
 Running TIS in a container is the easiest way to run this OOT. To do so, you'll need to have nvidia drivers installed and Docker installed. Once these are installed, you also need the ```nvidia-container-toolkit``` package from apt.
