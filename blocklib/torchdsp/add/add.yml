@@ -28,10 +28,10 @@ parameters:
   label: "Device"
   dtype: string
   default: "cpu"
-- id: max_batch_size
-  label: "Max Batch Size"
-  dtype: size
-  default: 256
+- id: async
+  label: Async
+  dtype: bool
+  default: false
 
 # Example Ports
 ports:

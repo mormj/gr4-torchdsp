@@ -1,2 +1,2 @@
-torchdsp_pybind_sources = [files('buffer_triton_pybind.cc')] + torchdsp_pybind_sources
-torchdsp_pybind_names = ['buffer_triton'] + torchdsp_pybind_names
+torchdsp_pybind_sources = [files('buffer_triton_pybind.cc','triton_async_block_pybind.cc')] + torchdsp_pybind_sources
+torchdsp_pybind_names = ['buffer_triton', 'triton_async_block'] + torchdsp_pybind_names

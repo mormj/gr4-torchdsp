@@ -1,4 +1,9 @@
 #include "graph_executor.h"
+#include <gnuradio/torchdsp/triton_async_block.h>
+#include <condition_variable>
+#include <http_client.h>
+#include <mutex>
+
 
 namespace gr {
 namespace schedulers {
@@ -11,7 +16,7 @@ inline static unsigned int round_down(unsigned int n, unsigned int multiple)
 executor_iteration_status_t
 graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
 {
-    executor_iteration_status_t status;
+    executor_iteration_status_t status = executor_iteration_status_t::READY;
 
     // If no blocks are specified for the iteration, then run over all the blocks
     // in the default ordering
@@ -125,7 +130,8 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
                 }
 
                 if (last_block->output_multiple_set()) {
-                    d_debug_logger->debug("output_multiple {}", last_block->output_multiple());
+                    d_debug_logger->debug("output_multiple {}",
+                                          last_block->output_multiple());
                     max_output_buffer =
                         round_down(max_output_buffer, last_block->output_multiple());
                 }
@@ -185,8 +191,30 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
                     d_debug_logger->debug("do_work for {}", b->alias());
                 }
 
+                if (b == last_block) {
+                    std::condition_variable cv;
+                    std::mutex m;
+                    bool ready{ false };
+                    auto lam = [&](triton::client::InferResult* r)
+                    {
+                        {
+                            std::unique_lock<std::mutex> lk(m);
+                            ready = true;
+                        }
+                        cv.notify_all();
+                    };
 
-                ret = b->do_work(wio);
+                    auto a = std::dynamic_pointer_cast<gr::torchdsp::async_block_interface>(b);
+                    a->set_async_callback(lam);
+                    ret = b->do_work(wio);
+                    // block on the callback from the async scheduler
+                    std::unique_lock<std::mutex> lk(m);
+                    cv.wait(lk, [&ready]() { return ready == true; });
+                } else {
+                    ret = b->do_work(wio);
+                }
+
+
                 d_debug_logger->debug("do_work returned {}", (int)ret);
                 // ret = work_return_t::OK;
 

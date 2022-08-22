@@ -17,12 +17,11 @@ namespace torchdsp {
  * @param triton_url
  * @return triton_model::sptr
  */
-triton_model::sptr triton_model::make(
-    const std::string& model_name,
-    const size_t max_batch_size,
-    const std::string& triton_url) {
-    auto model =
-        std::make_unique<triton_model_impl>(model_name, max_batch_size, triton_url);
+triton_model::sptr triton_model::make(const std::string& model_name,
+                                      const bool async,
+                                      const std::string& triton_url)
+{
+    auto model = std::make_unique<triton_model_impl>(model_name, async, triton_url);
 
     if (model.get()->get_num_inputs() == 0) {
         model.reset();
@@ -38,7 +37,8 @@ triton_model::sptr triton_model::make(
  * @param other
  */
 triton_model_impl::triton_model_impl(triton_model_impl&& other)
-    : client_(std::move(other.client_)), options_(other.model_name_) {
+    : client_(std::move(other.client_)), options_(other.model_name_)
+{
 
     for (const auto& input_ptr : other.input_ptrs_)
         input_ptrs_.push_back(std::move(input_ptr));
@@ -58,7 +58,8 @@ triton_model_impl::triton_model_impl(triton_model_impl&& other)
  * @param other
  * @return triton_model_impl&
  */
-triton_model_impl& triton_model_impl::operator=(triton_model_impl&& other) {
+triton_model_impl& triton_model_impl::operator=(triton_model_impl&& other)
+{
     client_ = std::move(other.client_);
     options_.model_name_ = other.model_name_;
 
@@ -82,11 +83,11 @@ triton_model_impl& triton_model_impl::operator=(triton_model_impl&& other) {
  * @param model_name model name available in TIS model repo
  * @param triton_url Non-protocol prefixed URL to running TIS instance
  */
-triton_model_impl::triton_model_impl(
-    const std::string& model_name,
-    const size_t max_batch_size,
-    const std::string& triton_url)
-    : model_name_(model_name), max_batch_size_(max_batch_size), options_(model_name) {
+triton_model_impl::triton_model_impl(const std::string& model_name,
+                                     const bool async,
+                                     const std::string& triton_url)
+    : model_name_(model_name), async_(async), options_(model_name)
+{
     tc::Error err = tc::InferenceServerHttpClient::Create(&client_, triton_url, false);
 
     if (!triton_model_impl::is_server_healthy(client_)) {
@@ -104,11 +105,11 @@ triton_model_impl::triton_model_impl(
         io_metadata_t io_meta = io_metadata_t{ parse_io_shape(metadata),
                                                parse_io_name(metadata),
                                                parse_io_datatype(metadata) };
-        auto io_mem = allocate_shm(io_meta, max_batch_size_);
+        auto io_mem = allocate_shm(io_meta);
         if (io_mem.element_byte_size == 0)
             break;
         inputs_.push_back(io_mem);
-        create_triton_input(client_, io_meta, io_mem);
+        create_triton_input(client_, io_meta);
     }
 
     // std::cout << "Allocated input memory" << std::endl;
@@ -118,11 +119,11 @@ triton_model_impl::triton_model_impl(
         io_metadata_t io_meta = io_metadata_t{ parse_io_shape(metadata),
                                                parse_io_name(metadata),
                                                parse_io_datatype(metadata) };
-        auto io_mem = allocate_shm(io_meta, max_batch_size_);
+        auto io_mem = allocate_shm(io_meta);
         if (io_mem.element_byte_size == 0)
             break;
         outputs_.push_back(io_mem);
-        create_triton_output(client_, io_meta, io_mem);
+        create_triton_output(client_, io_meta);
     }
 
     // std::cout << "Allocated output memory" << std::endl;
@@ -147,24 +148,7 @@ triton_model_impl::triton_model_impl(
  * @brief Destroy the triton model impl::triton model impl object
  *
  */
-triton_model_impl::~triton_model_impl() {
-    int idx = 0;
-    for (const auto& input : inputs_) {
-        client_->UnregisterSystemSharedMemory(registered_input_names_[idx]);
-        tc::UnmapSharedMemory(input.data_ptr, input.element_byte_size * input.batch_size);
-        tc::UnlinkSharedMemoryRegion(input.shm_key);
-        idx++;
-    }
-
-    idx = 0;
-    for (const auto& output : outputs_) {
-        client_->UnregisterSystemSharedMemory(registered_output_names_[idx]);
-        tc::UnmapSharedMemory(
-            output.data_ptr, output.element_byte_size * output.batch_size);
-        tc::UnlinkSharedMemoryRegion(output.shm_key);
-        idx++;
-    }
-}
+triton_model_impl::~triton_model_impl() {}
 
 
 /**
@@ -175,7 +159,8 @@ triton_model_impl::~triton_model_impl() {
  * @return false server ain't ready or ain't live
  */
 bool triton_model_impl::is_server_healthy(
-    const std::unique_ptr<tc::InferenceServerHttpClient>& client) {
+    const std::unique_ptr<tc::InferenceServerHttpClient>& client)
+{
     bool is_live;
     tc::Error err = client->IsServerLive(&is_live);
     if (!(err.IsOk() && is_live))
@@ -199,7 +184,8 @@ bool triton_model_impl::is_server_healthy(
  * @param shape
  * @return int64_t
  */
-int64_t triton_model_impl::num_elements(const std::vector<int64_t>& shape) {
+size_t triton_model_impl::num_elements(const std::vector<int64_t>& shape)
+{
     int64_t num_elements = 1;
     for (const int64_t& dim_size : shape)
         num_elements *= dim_size;
@@ -213,7 +199,8 @@ int64_t triton_model_impl::num_elements(const std::vector<int64_t>& shape) {
  * @param data_type
  * @return int64_t
  */
-int64_t triton_model_impl::itemsize(const std::string& data_type) {
+size_t triton_model_impl::itemsize(const std::string& data_type)
+{
     if (std ::string("FP32").compare(data_type) == 0)
         return 4;
     if (std ::string("FLOAT32").compare(data_type) == 0)
@@ -237,7 +224,8 @@ int64_t triton_model_impl::itemsize(const std::string& data_type) {
  */
 rapidjson::Document triton_model_impl::get_model_metadata(
     const std::unique_ptr<tc::InferenceServerHttpClient>& client,
-    const std::string& model_name) {
+    const std::string& model_name)
+{
     std::string model_metadata;
     client->ModelMetadata(&model_metadata, model_name);
     rapidjson::Document json_metadata;
@@ -251,30 +239,19 @@ rapidjson::Document triton_model_impl::get_model_metadata(
  * @param io_meta
  * @return triton_model_impl::io_memory_t
  */
-triton_model_impl::io_memory_t triton_model_impl::allocate_shm(
-    const io_metadata_t& io_meta,
-    const size_t max_batch_size) {
+triton_model_impl::io_memory_t
+triton_model_impl::allocate_shm(const io_metadata_t& io_meta)
+{
 
     static unsigned int segment_number = 0;
 
-    int shm_fd_ip;
-    void* data_ptr = (void *)0x12345678;
+    void* data_ptr = (void*)0x12345678;
     std::string shm_key =
         std::string("/gr_") + io_meta.name + std::to_string(segment_number);
-    size_t num_bytes =
-        num_elements(io_meta.shape) * itemsize(io_meta.datatype) * max_batch_size;
-
-    // tc::Error error = tc::CreateSharedMemoryRegion(shm_key, num_bytes, &shm_fd_ip);
-    // tc::MapSharedMemory(shm_fd_ip, 0, num_bytes, (void**)&data_ptr);
-    // tc::CloseSharedMemory(shm_fd_ip);
-
-    // if (!error.IsOk())
-    //     return io_memory_t{ 0, 0, 0, "", 0 };
 
     segment_number += 1;
     return io_memory_t{ static_cast<size_t>(itemsize(io_meta.datatype)),
-                        num_bytes / max_batch_size,
-                        max_batch_size,
+                        num_elements(io_meta.shape) * itemsize(io_meta.datatype),
                         shm_key,
                         data_ptr };
 }
@@ -288,8 +265,8 @@ triton_model_impl::io_memory_t triton_model_impl::allocate_shm(
  */
 void triton_model_impl::create_triton_input(
     const std::unique_ptr<tc::InferenceServerHttpClient>& client,
-    const io_metadata_t& io_meta,
-    const io_memory_t& io_mem) {
+    const io_metadata_t& io_meta)
+{
 
     static int input_number = 0;
     // Create shared ptr for the InferInput
@@ -305,12 +282,6 @@ void triton_model_impl::create_triton_input(
         std::to_string(input_number) + std::string("input_") + io_meta.name;
     registered_input_names_.push_back(registered_name);
 
-    // client->RegisterSystemSharedMemory(
-    //     registered_name, io_mem.shm_key, io_mem.element_byte_size * io_mem.batch_size);
-
-    // input_ptrs_.back()->SetSharedMemory(
-    //     registered_name, io_mem.element_byte_size * io_mem.batch_size, 0);
-
     input_number += 1;
 }
 
@@ -323,8 +294,8 @@ void triton_model_impl::create_triton_input(
  */
 void triton_model_impl::create_triton_output(
     const std::unique_ptr<tc::InferenceServerHttpClient>& client,
-    const io_metadata_t& io_meta,
-    const io_memory_t& io_mem) {
+    const io_metadata_t& io_meta)
+{
 
     static int output_number = 0;
 
@@ -339,90 +310,16 @@ void triton_model_impl::create_triton_output(
     auto registered_name =
         std::to_string(output_number) + std::string("output_") + io_meta.name;
     registered_output_names_.push_back(registered_name);
-    // client->RegisterSystemSharedMemory(
-    //     std::to_string(output_number) + std::string("output_") + io_meta.name,
-    //     io_mem.shm_key,
-    //     io_mem.element_byte_size * io_mem.batch_size);
-
-    // output_ptrs_.back()->SetSharedMemory(
-    //     std::to_string(output_number) + std::string("output_") + io_meta.name,
-    //     io_mem.element_byte_size * io_mem.batch_size,
-    //     0);
 
     output_number += 1;
 }
 
-void triton_model_impl::infer(
-    std::vector<const char*> in_buffers,
-    std::vector<char*> out_buffers) {
-    // it'd be great if we can avoid this, but really may not be necessary to avoid
-    for (size_t idx = 0; idx < in_buffers.size(); idx++)
-        std::memcpy(
-            inputs_[idx].data_ptr, in_buffers[idx], inputs_[idx].element_byte_size);
-
-    // std::cout << "Copied to input buffers." << std::endl;
-    std::vector<tc::InferInput*> inputs;
-    for (const auto& input_ptr : input_ptrs_)
-        inputs.push_back(input_ptr.get());
-
-    std::vector<const tc::InferRequestedOutput*> outputs;
-    for (const auto& output_ptr : output_ptrs_)
-        outputs.push_back(output_ptr.get());
-
-    // std::cout << "Copied input and output raw pointers." << std::endl;
-    tc::InferResult* result;
-    client_->Infer(&result, options_, inputs, outputs);
-
-    // std::cout << "Inferred on result" << std::endl;
-    // it'd be great if we can avoid this, but really may not be necessary to avoid
-    for (uint16_t idx = 0; idx < out_buffers.size(); idx++)
-        std::memcpy(
-            out_buffers[idx], outputs_[idx].data_ptr, outputs_[idx].element_byte_size);
-}
-
-void triton_model_impl::infer_batch(
-    std::vector<const char*>& in_buffers,
-    std::vector<char*>& out_buffers,
-    size_t batch_size) {
-
-    for (size_t idx = 0; idx < in_buffers.size(); idx++)
-        std::memcpy(
-            inputs_[idx].data_ptr,
-            in_buffers[idx],
-            inputs_[idx].element_byte_size * batch_size);
-
-    std::vector<tc::InferInput*> inputs;
-    for (const auto& input_ptr : input_ptrs_) {
-        // We have to modify the shape of the input
-        std::vector<int64_t> new_shape;
-        for (const auto& dim : input_ptr->Shape())
-            new_shape.push_back(dim);
-        new_shape[0] = batch_size; // We just override the first dimension.
-        input_ptr->SetShape(new_shape);
-        inputs.push_back(input_ptr.get());
-    }
-
-    std::vector<const tc::InferRequestedOutput*> outputs;
-    for (const auto& output_ptr : output_ptrs_) {
-        outputs.push_back(output_ptr.get());
-    }
-
-    tc::InferResult* result;
-    client_->Infer(&result, options_, inputs, outputs);
-
-    // std::cout << "Inferred on result" << std::endl;
-    // it'd be great if we can avoid this, but really may not be necessary to avoid
-    for (size_t idx = 0; idx < out_buffers.size(); idx++)
-        std::memcpy(
-            out_buffers[idx],
-            outputs_[idx].data_ptr,
-            outputs_[idx].element_byte_size * batch_size);
-}
-
-
-void triton_model_impl::infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
-                  std::vector<buffer_triton*>& out_buffers,
-                  size_t batch_size) {
+void triton_model_impl::infer_batch_zerocopy(
+    std::vector<buffer_triton_reader*>& in_buffers,
+    std::vector<buffer_triton*>& out_buffers,
+    size_t batch_size,
+    std::function<void(triton::client::InferResult*)> cb)
+{
 
     std::vector<tc::InferInput*> inputs;
     int idx = 0;
@@ -434,12 +331,13 @@ void triton_model_impl::infer_batch_zerocopy(std::vector<buffer_triton_reader*>&
         new_shape[0] = batch_size; // We just override the first dimension.
         input_ptr->SetShape(new_shape);
 
-        // void * start_of_buffer = in_buffers[idx]->read_ptr() - in_buffers[idx]->read_index();
+        // void * start_of_buffer = in_buffers[idx]->read_ptr() -
+        // in_buffers[idx]->read_index();
         size_t offset = in_buffers[idx]->read_index();
-
-        //input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(), in_buffers[idx]->items_available()*in_buffers[idx]->item_size(), offset);
-        // std::cout << "infer: " << in_buffers[idx]->shm_key() << std::endl;
-        input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(), in_buffers[idx]->items_available()*in_buffers[idx]->item_size(), offset);
+        input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(),
+                                   in_buffers[idx]->items_available() *
+                                       in_buffers[idx]->item_size(),
+                                   offset);
         inputs.push_back(input_ptr.get());
         idx++;
     }
@@ -447,18 +345,34 @@ void triton_model_impl::infer_batch_zerocopy(std::vector<buffer_triton_reader*>&
     std::vector<const tc::InferRequestedOutput*> outputs;
     idx = 0;
     for (const auto& output_ptr : output_ptrs_) {
-        // void * start_of_buffer = out_buffers[idx]->write_ptr() - out_buffers[idx]->write_index();
+        // void * start_of_buffer = out_buffers[idx]->write_ptr() -
+        // out_buffers[idx]->write_index();
         size_t offset = out_buffers[idx]->write_index();
         // std::cout << "infer: " << out_buffers[idx]->shm_key() << std::endl;
-        output_ptr->SetSharedMemory(out_buffers[idx]->shm_key(), out_buffers[idx]->space_available()*out_buffers[idx]->item_size(), offset);
+        output_ptr->SetSharedMemory(out_buffers[idx]->shm_key(),
+                                    out_buffers[idx]->space_available() *
+                                        out_buffers[idx]->item_size(),
+                                    offset);
         outputs.push_back(output_ptr.get());
         idx++;
     }
 
     tc::InferResult* result;
-    tc::Error err = client_->Infer(&result, options_, inputs, outputs);
-    if (!err.IsOk()) {
-        std::cout << err << std::endl;
+
+    if (!async_) {
+        tc::Error err = client_->Infer(&result, options_, inputs, outputs);
+        if (!err.IsOk()) {
+            std::cout << err << std::endl;
+        }
+    }
+    else {
+        tc::Error err = client_->AsyncInfer(cb,
+            options_,
+            inputs,
+            outputs);
+        if (!err.IsOk()) {
+            std::cout << err << std::endl;
+        }
     }
 
     // for (uint16_t idx = 0; idx < out_buffers.size(); idx++) {

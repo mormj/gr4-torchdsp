@@ -16,6 +16,8 @@ from gnuradio import streamops
 from gnuradio import torchdsp
 from matplotlib import pyplot as plt
 
+from gnuradio.schedulers.nbt import scheduler_nbt as nbt
+from gnuradio.schedulers.triton import scheduler_triton as tsched
 
 
 def snipfcn_snippet_0(fg, rt=None):
@@ -41,41 +43,40 @@ class untitled(gr.flowgraph):
         ##################################################
         # Blocks
         ##################################################
-        self.torchdsp_add_0 = torchdsp.triton_block(2, 1, "add_cpu_openvino", False, 'localhost:8000', [], [])
-        self.streamops_head_0 = streamops.head( nitems,0, impl=streamops.head.cpu)
-        self.snk = blocks.vector_sink_f( 1,nitems, impl=blocks.vector_sink_f.cpu)
-        self.analog_sig_source_0_0 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1234,1.0,0,0, impl=analog.sig_source_f.cpu)
-        self.analog_sig_source_0 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1000,1.0,0,0, impl=analog.sig_source_f.cpu)
+
+        # Setting the async flag to true will require the async triton scheduler
+        blk = torchdsp.triton_block(2, 1, "add_cpu_openvino", True, 'localhost:8000', [], [])
+        hd = streamops.head( nitems,0, impl=streamops.head.cpu)
+        snk = blocks.vector_sink_f( 1,nitems, impl=blocks.vector_sink_f.cpu)
+        src1 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1234,1.0,0,0, impl=analog.sig_source_f.cpu)
+        src2 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1000,1.0,0,0, impl=analog.sig_source_f.cpu)
 
 
         ##################################################
         # Connections
         ##################################################
-        self.connect((self.analog_sig_source_0, 0), (self.torchdsp_add_0, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
-        self.connect((self.analog_sig_source_0_0, 0), (self.torchdsp_add_0, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
-        self.connect((self.streamops_head_0, 0), (self.snk, 0))
-        self.connect((self.torchdsp_add_0, 0), (self.streamops_head_0, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+        self.connect((src1, 0), (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+        self.connect((src2, 0), (blk, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
+        self.connect((hd, 0), (snk, 0))
+        self.connect((blk, 0), (hd, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make())
 
 
-    def get_samp_rate(self):
-        return self.samp_rate
+        sched1 = nbt()
+        sched2 = tsched()
 
-    def set_samp_rate(self, samp_rate):
-        self.samp_rate = samp_rate
+        self.rt = gr.runtime()
 
-    def get_nitems(self):
-        return self.nitems
+        self.rt.add_scheduler((sched1, [src1, src2, hd, snk]))
+        self.rt.add_scheduler((sched2, [blk,]))
 
-    def set_nitems(self, nitems):
-        self.nitems = nitems
 
 
 
 
 def main(flowgraph_cls=untitled, options=None):
     fg = flowgraph_cls()
-    rt = gr.runtime()
-
+    
+    rt = fg.rt
 
     rt.initialize(fg)
 

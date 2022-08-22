@@ -18,7 +18,7 @@ namespace torchdsp {
 
 triton_block_triton::triton_block_triton(block_args args) : INHERITED_CONSTRUCTORS
 {
-    model_ = triton_model::make(args.model_name, args.max_batch_size, args.triton_url);
+    model_ = triton_model::make(args.model_name, args.async, args.triton_url);
     if (model_ == nullptr)
         throw std::runtime_error("Could not instantiate triton_model");
     set_output_multiple(model_.get()->get_output_sizes()[0] /
@@ -54,7 +54,7 @@ work_return_t triton_block_triton::work(work_io& wio)
         model_.get()->get_output_sizes()[0] / model_.get()->get_output_signature()[0];
     auto batch_size = noutput_items / num_items_per_batch;
 
-    model_->infer_batch_zerocopy(in_bufs, out_bufs, batch_size);
+    model_->infer_batch_zerocopy(in_bufs, out_bufs, batch_size, _callback);
 
     // for (int i=0; i<10; i++)
     // {

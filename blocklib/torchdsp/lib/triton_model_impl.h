@@ -31,7 +31,6 @@ public:
     typedef struct io_memory_s {
         size_t item_size;
         size_t element_byte_size;
-        size_t batch_size;
         std::string shm_key;
         void* data_ptr;
     } io_memory_t;
@@ -46,13 +45,13 @@ private:
     std::vector<std::string> registered_input_names_;
     std::vector<std::string> registered_output_names_;
     tc::InferResult* results_ = nullptr;
-    size_t max_batch_size_;
+    bool async_;
     tc::InferOptions options_;
 
 
 public:
     triton_model_impl(const std::string& model_name,
-                      const size_t max_batch_size,
+                      const bool async,
                       const std::string& triton_url);
 
     // We override these to prevent memory leaks.
@@ -92,13 +91,10 @@ public:
             sizes.push_back(output.element_byte_size);
         return sizes;
     }
-    void infer(std::vector<const char*> in_buffers, std::vector<char*> out_buffers);
-    void infer_batch(std::vector<const char*>& in_buffers,
-                     std::vector<char*>& out_buffers,
-                     size_t batch_size);
     void infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
                   std::vector<buffer_triton*>& out_buffers,
-                  size_t batch_size);
+                  size_t batch_size,
+                  std::function<void(triton::client::InferResult*)>);
 
     // Interface to Triton Server
     static rapidjson::Document
@@ -109,13 +105,11 @@ public:
     is_server_healthy(const std::unique_ptr<tc::InferenceServerHttpClient>& client);
 
     void create_triton_input(const std::unique_ptr<tc::InferenceServerHttpClient>& client,
-                             const io_metadata_t& io_meta,
-                             const io_memory_t& io_mem);
+                             const io_metadata_t& io_meta);
 
     void
     create_triton_output(const std::unique_ptr<tc::InferenceServerHttpClient>& client,
-                         const io_metadata_t& io_meta,
-                         const io_memory_t& io_mem);
+                         const io_metadata_t& io_meta);
 
     // JSON Parsing
     static std::vector<int64_t> parse_io_shape(const rapidjson::Value& io_metadata)
@@ -136,10 +130,9 @@ public:
     };
 
     // Configuring IO
-    static int64_t itemsize(const std::string& data_type);
-    static int64_t num_elements(const std::vector<int64_t>& shape);
-    static io_memory_t allocate_shm(const io_metadata_t& io_meta,
-                                    const size_t max_batch_size);
+    static size_t itemsize(const std::string& data_type);
+    static size_t num_elements(const std::vector<int64_t>& shape);
+    static io_memory_t allocate_shm(const io_metadata_t& io_meta);
 };
 
 } // namespace torchdsp

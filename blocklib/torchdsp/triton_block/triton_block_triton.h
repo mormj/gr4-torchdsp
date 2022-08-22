@@ -22,8 +22,17 @@ public:
     triton_block_triton(block_args args);
     work_return_t work(work_io& wio) override;
 
+    void set_async_callback(std::function<void(triton::client::InferResult*)> cb) override
+    {
+        _callback = cb;
+    }
+
 private:
     std::unique_ptr<triton_model> model_;
+
+    // Initialize with a callback that does nothing
+    std::function<void(triton::client::InferResult*)> _callback =
+        [](triton::client::InferResult* r) {};
 };
 
 } // namespace torchdsp

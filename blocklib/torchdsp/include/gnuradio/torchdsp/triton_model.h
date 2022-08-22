@@ -9,8 +9,8 @@
 #define INCLUDED_TORCHDSP_TRITON_MODEL_H
 
 #include <gnuradio/sync_block.h>
-#include <gnuradio/torchdsp/buffer_triton.h>
 #include <gnuradio/torchdsp/api.h>
+#include <gnuradio/torchdsp/buffer_triton.h>
 
 namespace gr {
 namespace torchdsp {
@@ -36,14 +36,11 @@ public:
     virtual std::vector<int> get_output_sizes() = 0;
     virtual std::vector<int> get_input_signature() = 0;
     virtual std::vector<int> get_output_signature() = 0;
-    virtual void infer(std::vector<const char*> in, std::vector<char*> out) = 0;
-    virtual void infer_batch(
-        std::vector<const char*>& in,
-        std::vector<char*>& out,
-        size_t batch_size) = 0;
-    virtual void infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
-                  std::vector<buffer_triton*>& out_buffers,
-                  size_t batch_size) = 0;
+    virtual void
+    infer_batch_zerocopy(std::vector<buffer_triton_reader*>& in_buffers,
+                         std::vector<buffer_triton*>& out_buffers,
+                         size_t batch_size,
+                         std::function<void(triton::client::InferResult*)> = nullptr) = 0;
     /*!
      * \brief Return a shared_ptr to a new instance of torchdsp::triton_model.
      *
@@ -52,10 +49,9 @@ public:
      * class. torchdsp::triton_model::make is the public interface for
      * creating new instances.
      */
-    static sptr make(
-        const std::string& model_name,
-        const size_t max_batch_size,
-        const std::string& triton_url = "localhost:8000");
+    static sptr make(const std::string& model_name,
+                     const bool async,
+                     const std::string& triton_url = "localhost:8000");
 };
 
 } // namespace torchdsp

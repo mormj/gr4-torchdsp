@@ -2,8 +2,11 @@ module: torchdsp
 block: triton_block
 label: triton_block
 blocktype: sync_block
+includes: 
+  - gnuradio/torchdsp/triton_async_block.h
+inherits: 
+  - async_block_interface
 
-# Example Parameters
 parameters:
     - id: num_in
       label: Number of Inputs
@@ -20,11 +23,11 @@ parameters:
       dtype: string
       grc:
           default: "simple"
-    - id: max_batch_size
-      label: "Max Batch Size"
-      dtype: size
+    - id: async
+      label: Async
+      dtype: bool
       grc:  
-        default: 256
+        default: False
     - id: triton_url
       label: Triton URL
       dtype: string
