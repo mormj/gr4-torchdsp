@@ -42,10 +42,13 @@ volk_dep = dependency('volk', version : '>=2.2')
 fmt_dep = dependency('fmt', method: 'cmake', modules: ['fmt::fmt'])
 pmtf_dep = dependency('pmtf', version : '>= 0.0.2')
 gnuradio_gr_dep = dependency('gnuradio-runtime')
+threads_dep = dependency('threads')
+yaml_dep = dependency('yaml-cpp', version : '>=0.6')
 
 run_command('python3', join_paths(SCRIPTS_DIR,'gen_meson.py'), 
   join_paths(meson.project_source_root(),'blocklib'), check: true)
   
 subdir('blocklib/torchdsp')
+subdir('schedulers')
 subdir('domains/grc')
 
