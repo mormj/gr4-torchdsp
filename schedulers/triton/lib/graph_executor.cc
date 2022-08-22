@@ -2,8 +2,10 @@
 #include <gnuradio/torchdsp/triton_async_block.h>
 #include <condition_variable>
 #include <http_client.h>
+#include <chrono>
 #include <mutex>
 
+using namespace std::chrono_literals;
 
 namespace gr {
 namespace schedulers {
@@ -28,11 +30,13 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
     auto last_block = blocks[blocks.size() - 1];
     bool ready = true;
 
-    { // INPUTS
-        work_io& wio = first_block->get_work_io();
-        wio.reset();
+    bool unclog_inputs = false;
+    bool unclog_outputs = false;
 
-        for (auto& w : wio.inputs()) {
+    work_io& first_wio = first_block->get_work_io();
+    { // INPUTS
+
+        for (auto& w : first_wio.inputs()) {
             auto p_buf = w.bufp();
             if (p_buf) {
                 auto max_read = p_buf->max_buffer_read();
@@ -68,37 +72,22 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
 
         if (!ready) {
             status = executor_iteration_status_t::BLKD_IN;
-
-            // If we are blocked on the input, run the input blocked callback on all
-            // inputs of all blocks
-            for (auto const& b : blocks) {
-                work_io& wio = first_block->get_work_io();
-                for (auto& w : wio.inputs()) {
-                    auto p_buf = w.bufp();
-                    if (p_buf->input_blocked_callback(s_min_items_to_process) &&
-                        b == first_block) {
-                        w.port->notify_scheduler_action(
-                            scheduler_action_t::NOTIFY_OUTPUT);
-                    }
-                }
-            }
-
+            unclog_inputs = true;
             return status;
         }
     }
 
+    work_io& last_wio = last_block->get_work_io();
     { // OUTPUTS
-        work_io& wio = last_block->get_work_io();
-        wio.reset();
+
         // for each output port of the block
-        for (auto& w : wio.outputs()) {
+        for (auto& w : last_wio.outputs()) {
 
             // When a block has multiple output buffers, it adds the restriction
             // that the work call can only produce the minimum available across
             // the buffers.
 
             size_t max_output_buffer = std::numeric_limits<int>::max();
-
 
             auto p_buf = w.bufp();
             if (p_buf) {
@@ -152,30 +141,30 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
 
         if (!ready) {
             status = executor_iteration_status_t::BLKD_OUT;
-            for (auto const& b : blocks) {
-                work_io& wio = b->get_work_io();
-                for (auto& w : wio.outputs()) {
-                    auto p_buf = w.bufp();
-                    if (p_buf->output_blocked_callback(false) && b == last_block) {
-                        w.port->notify_scheduler_action(scheduler_action_t::NOTIFY_INPUT);
-                    }
-                }
-            }
-
-            return status;
+            unclog_outputs = true;
         }
     }
 
-    for (auto const& b : blocks) {
-        if (b->is_hier()) {
-            continue;
-        }
 
-        work_io& wio = b->get_work_io();
-        wio.reset();
+    if (ready) {
+
+        for (auto const& b : blocks) {
+            if (b->is_hier()) {
+                continue;
+            }
+
+            work_io& wio = b->get_work_io();
+            for (auto& w : wio.inputs()) {
+                w.n_items = first_wio.inputs()[0].n_items;
+                w.n_consumed = 0;
+            }
+
+            for (auto& w : wio.outputs()) {
+                w.n_items = last_wio.outputs()[0].n_items;
+                w.n_produced = 0;
+            }
 
 
-        if (ready) {
             work_return_t ret;
             while (true) {
 
@@ -195,21 +184,40 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
                     std::condition_variable cv;
                     std::mutex m;
                     bool ready{ false };
-                    auto lam = [&](triton::client::InferResult* r)
-                    {
+                    auto lam = [&](triton::client::InferResult* r) {
                         {
                             std::unique_lock<std::mutex> lk(m);
                             ready = true;
+                            d_debug_logger->debug("got callback for {}", b->alias());
                         }
                         cv.notify_all();
                     };
 
-                    auto a = std::dynamic_pointer_cast<gr::torchdsp::async_block_interface>(b);
+                    auto a =
+                        std::dynamic_pointer_cast<gr::torchdsp::async_block_interface>(b);
                     a->set_async_callback(lam);
                     ret = b->do_work(wio);
-                    // block on the callback from the async scheduler
-                    std::unique_lock<std::mutex> lk(m);
-                    cv.wait(lk, [&ready]() { return ready == true; });
+                    if (ret == work_return_t::OK || ret == work_return_t::DONE) {
+                        // block on the callback from the async scheduler
+                        d_debug_logger->debug("waiting for callback {}", b->alias());
+                        std::unique_lock<std::mutex> lk(m);
+                        //cv.wait_for(lk, 200ms, [&ready]() { return ready == true; });
+                        cv.wait(lk, [&ready]() { return ready == true; });
+                        d_debug_logger->debug(
+                            " ... done waiting {} {}", ready, b->alias());
+                    } else {
+                        if (ret == work_return_t::INSUFFICIENT_INPUT_ITEMS) {
+                            unclog_inputs = true;
+                            status = executor_iteration_status_t::BLKD_IN;
+                            break;
+                        } else if (ret == work_return_t::INSUFFICIENT_OUTPUT_ITEMS) {
+                            unclog_outputs = true;
+                            status = executor_iteration_status_t::BLKD_OUT;
+                            break;
+                        }
+                    }
+
+
                 } else {
                     ret = b->do_work(wio);
                 }
@@ -240,6 +248,68 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
 
 
                     break;
+                }
+            }
+        }
+
+        auto nc = first_block->get_work_io().inputs()[0].n_consumed;
+        for (auto& b : blocks) {
+            for (auto& w : b->get_work_io().inputs()) {
+                auto p_buf = w.bufp();
+                if (p_buf) {
+                    d_debug_logger->debug(
+                        "post_read {} - {}, total: {}", b->alias(), nc, w.nitems_read());
+
+                    p_buf->post_read(w.n_consumed);
+                }
+            }
+        }
+
+        for (auto& w : first_block->get_work_io().inputs()) {
+            w.port->notify_scheduler_action(scheduler_action_t::NOTIFY_OUTPUT);
+        }
+
+        auto np = last_block->get_work_io().outputs()[0].n_produced;
+        for (auto& b : blocks) {
+            for (auto& w : b->get_work_io().outputs()) {
+                auto p_buf = w.bufp();
+                if (p_buf) {
+                    d_debug_logger->debug("post_write {} - {}, total: {}",
+                                          b->alias(),
+                                          np,
+                                          w.nitems_written());
+                    p_buf->post_write(np);
+                }
+            }
+        }
+
+        for (auto& w : last_block->get_work_io().outputs()) {
+            w.port->notify_scheduler_action(scheduler_action_t::NOTIFY_INPUT);
+        }
+    }
+
+
+    if (unclog_inputs) {
+        // If we are blocked on the input, run the input blocked callback on all
+        // inputs of all blocks
+        for (auto const& b : blocks) {
+            work_io& wio = b->get_work_io();
+            for (auto& w : wio.inputs()) {
+                auto p_buf = w.bufp();
+                if (p_buf->input_blocked_callback(s_min_items_to_process) &&
+                    b == first_block) {
+                    w.port->notify_scheduler_action(scheduler_action_t::NOTIFY_OUTPUT);
+                }
+            }
+        }
+
+    } else if (unclog_outputs) {
+        for (auto const& b : blocks) {
+            work_io& wio = b->get_work_io();
+            for (auto& w : wio.outputs()) {
+                auto p_buf = w.bufp();
+                if (p_buf->output_blocked_callback(false) && b == last_block) {
+                    w.port->notify_scheduler_action(scheduler_action_t::NOTIFY_INPUT);
                 }
             }
         }

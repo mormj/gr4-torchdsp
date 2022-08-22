@@ -47,7 +47,7 @@ class untitled(gr.flowgraph):
         # Setting the async flag to true will require the async triton scheduler
         blk = torchdsp.triton_block(2, 1, "add_cpu_openvino", True, 'localhost:8000', [], [])
         hd = streamops.head( nitems,0, impl=streamops.head.cpu)
-        snk = blocks.vector_sink_f( 1,nitems, impl=blocks.vector_sink_f.cpu)
+        self.snk = snk = blocks.vector_sink_f( 1,nitems, impl=blocks.vector_sink_f.cpu)
         src1 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1234,1.0,0,0, impl=analog.sig_source_f.cpu)
         src2 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1000,1.0,0,0, impl=analog.sig_source_f.cpu)
 
