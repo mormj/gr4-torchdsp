@@ -36,7 +36,7 @@ class benchmark_copy(gr.top_block):
         op_blocks = []
         for i in range(num_blocks):
             op_blocks.append(
-                torchdsp.triton_block(2, 1, f'{args.operation}_{args.device}', args.batch_size, args.addr, [], [])
+                torchdsp.triton_block(1, 1, f'{args.operation}_{args.device}', False, args.addr, [], [])
             )
         self.blocks.extend(op_blocks)
 
@@ -53,16 +53,21 @@ class benchmark_copy(gr.top_block):
         self.connect((hd, 0), (snk, 0))
         for idx, blk in enumerate(op_blocks):
             if (idx == 0):
-                self.connect((src, 0), (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
+                self.connect((src, 0), (blk, 0))\
+                    .set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
             else:
-                self.connect(op_blocks[idx-1], (blk, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
+                self.connect(op_blocks[idx-1], (blk, 0))\
+                    .set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
 
-            ns = blocks.null_source()
-            self.blocks.append(ns)
-            self.connect((ns, 0), (blk, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
+            if args.operation in ['add']:
+                ns = blocks.null_source()
+                self.blocks.append(ns)
+                self.connect((ns, 0), (blk, 1)).set_custom_buffer(torchdsp.buffer_triton_properties.make()\
+                    .set_buffer_size(buffer_size))
 
 
-        self.connect((op_blocks[num_blocks-1], 0), (hd, 0)).set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
+        self.connect((op_blocks[num_blocks-1], 0), (hd, 0))\
+            .set_custom_buffer(torchdsp.buffer_triton_properties.make().set_buffer_size(buffer_size))
 
 
 def main(top_block_cls=benchmark_copy, options=None):
@@ -96,7 +101,7 @@ def main(top_block_cls=benchmark_copy, options=None):
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
 
-    sched = nbt.scheduler_nbt("sched")
+    sched = nbt.scheduler_nbt()
     if (args.group):
         sched.add_block_group(tb.blocks)
 

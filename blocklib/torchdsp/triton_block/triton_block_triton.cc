@@ -32,9 +32,9 @@ work_return_t triton_block_triton::work(work_io& wio)
 
     auto noutput_items = wio.outputs()[0].n_items;
 
-    auto in1 = wio.inputs()[0].items<float>();
-    auto in2 = wio.inputs()[1].items<float>();
-    auto out = wio.outputs()[0].items<float>();
+    // auto in1 = wio.inputs()[0].items<float>();
+    // auto in2 = wio.inputs()[1].items<float>();
+    // auto out = wio.outputs()[0].items<float>();
 
     std::vector<buffer_triton_reader*> in_bufs;
     for (auto& w : wio.inputs()) {
