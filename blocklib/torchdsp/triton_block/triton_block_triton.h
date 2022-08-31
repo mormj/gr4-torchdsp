@@ -32,7 +32,8 @@ private:
 
     // Initialize with a callback that does nothing
     std::function<void(triton::client::InferResult*)> _callback =
-        [](triton::client::InferResult* r) {};
+        [](triton::client::InferResult*
+               r) { /*std::cout << "******************default callback" << std::endl;*/ };
 };
 
 } // namespace torchdsp
