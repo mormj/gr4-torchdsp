@@ -29,14 +29,28 @@ private:
 
     buffer_manager::sptr _bufman;
 
+    void _sort(std::vector<block_sptr>& blks)
+    {
+       
+        std::sort(blks.begin(), blks.end(), [](block_sptr a, block_sptr b) {
+            return a->id() < b->id();
+        });
+
+        for (auto& b : blks)
+        {
+            std::cout << b->id() << std::endl;
+        }
+    }
+
 public:
     graph_executor(const std::string& name) : executor(name), s_fixed_buf_size(32768){};
     ~graph_executor(){};
 
-    void initialize(buffer_manager::sptr bufman, std::vector<block_sptr> blocks)
+
+    void initialize(buffer_manager::sptr bufman, std::vector<block_sptr>& blocks)
     {
         _bufman = bufman;
-        d_blocks = blocks;
+        _sort(blocks);
     }
 
     executor_iteration_status_t

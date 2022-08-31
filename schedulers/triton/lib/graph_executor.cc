@@ -30,6 +30,10 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
     auto last_block = blocks[blocks.size() - 1];
     bool ready = true;
 
+    d_debug_logger->debug("first {} - last {}",
+                            first_block->alias(),
+                            last_block->alias());
+
     bool unclog_inputs = false;
     bool unclog_outputs = false;
 
