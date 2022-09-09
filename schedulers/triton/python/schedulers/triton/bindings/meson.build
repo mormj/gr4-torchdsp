@@ -6,6 +6,7 @@ gnuradio_scheduler_triton_pybind = py3_inst.extension_module('scheduler_triton_p
     scheduler_triton_pybind_sources, 
     dependencies : [gnuradio_gr_dep, gnuradio_scheduler_triton_dep, python3_dep, pybind11_dep],
     link_language : 'cpp',
+    include_directories: incdir_numpy,
     install : true,
     install_dir : join_paths(py3_inst.get_install_dir(),'gnuradio','schedulers','triton')
 )

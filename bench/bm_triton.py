@@ -45,7 +45,7 @@ class benchmark_copy(gr.top_block):
         src = blocks.null_source()
         snk = blocks.null_sink()
         hd = streamops.head(actual_samples, 
-            gr.sizeof_float*veclen)
+            gr.sizeof_gr_complex*veclen)
 
         self.gr_blocks.extend([src,snk,hd])
         ##################################################

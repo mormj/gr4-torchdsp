@@ -10,6 +10,7 @@ project('ns-torchdsp', 'cpp',
 python3_dep = dependency('python3', required : get_option('enable_python'))
 python3_embed_dep = dependency('python3-embed', required : get_option('enable_python'))
 py3_inst = import('python').find_installation('python3')
+py3=py3_inst
 pybind11_dep = dependency('pybind11', required : get_option('enable_python'))
 json_dep = dependency('nlohmann_json')
 
@@ -47,7 +48,12 @@ yaml_dep = dependency('yaml-cpp', version : '>=0.6')
 
 run_command('python3', join_paths(SCRIPTS_DIR,'gen_meson.py'), 
   join_paths(meson.project_source_root(),'blocklib'), check: true)
-  
+
+incdir_numpy = run_command(py3,
+  ['-c', 'import os; os.chdir(".."); import numpy; print(numpy.get_include())'],
+  check : true
+).stdout().strip()
+
 subdir('blocklib/torchdsp')
 subdir('schedulers')
 subdir('domains/grc')
