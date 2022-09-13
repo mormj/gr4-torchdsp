@@ -326,8 +326,11 @@ void triton_model_impl::infer_batch_zerocopy(
     for (const auto& input_ptr : input_ptrs_) {
         // We have to modify the shape of the input
         std::vector<int64_t> new_shape;
-        for (const auto& dim : input_ptr->Shape())
+        size_t nitems = 1;
+        for (const auto& dim : input_ptr->Shape()) {
             new_shape.push_back(dim);
+            nitems *= dim;
+        }
         new_shape[0] = batch_size; // We just override the first dimension.
         input_ptr->SetShape(new_shape);
 
@@ -335,7 +338,7 @@ void triton_model_impl::infer_batch_zerocopy(
         // in_buffers[idx]->read_index();
         size_t offset = in_buffers[idx]->read_index();
         input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(),
-                                   in_buffers[idx]->items_available() *
+                                   nitems *
                                        in_buffers[idx]->item_size(),
                                    offset);
         inputs.push_back(input_ptr.get());

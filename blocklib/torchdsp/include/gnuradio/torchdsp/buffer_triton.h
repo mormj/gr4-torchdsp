@@ -16,10 +16,11 @@ namespace tc = triton::client;
 namespace gr {
 enum class buffer_triton_type { D2D, H2D, D2H, UNKNOWN };
 
-class buffer_triton : public buffer_sm
+class buffer_triton : public buffer
 {
 private:
     void* _shared_memory;
+    uint8_t* _buffer;
     size_t _buffer_size;
     buffer_triton_type _type = buffer_triton_type::UNKNOWN;
     std::string _shm_key;
@@ -43,16 +44,40 @@ public:
     virtual buffer_reader_uptr add_reader(std::shared_ptr<buffer_properties> buf_props,
                                           size_t itemsize);
 
+    void* read_ptr(size_t index) { return (void*)&_buffer[index]; }
+    void* write_ptr() { return (void*)&_buffer[_write_index]; }
 
-    virtual bool output_blocked_callback(bool force = false) override
+    void post_write(int num_items)
     {
-        return output_blocked_callback_logic(force, std::memmove);
+        std::scoped_lock guard(_buf_mutex);
+
+        size_t bytes_written = num_items * _item_size;
+        size_t wi1 = _write_index;
+        size_t wi2 = _write_index + _buf_size;
+        // num_items were written to the buffer
+        // copy the data to the second half of the buffer
+
+        size_t num_bytes_1 = std::min(_buf_size - wi1, bytes_written);
+        size_t num_bytes_2 = bytes_written - num_bytes_1;
+
+        memcpy(&_buffer[wi2], &_buffer[wi1], num_bytes_1);
+        if (num_bytes_2)
+            memcpy(&_buffer[0], &_buffer[_buf_size], num_bytes_2);
+
+
+        // advance the write pointer
+        _write_index += bytes_written;
+        if (_write_index >= _buf_size) {
+            _write_index -= _buf_size;
+        }
+
+        _total_written += num_items;
     }
 
     std::string& shm_key() { return _shm_key; }
 };
 
-class buffer_triton_reader : public buffer_sm_reader
+class buffer_triton_reader : public buffer_reader
 {
 private:
     // logger_ptr d_logger;
@@ -66,30 +91,22 @@ public:
                          std::shared_ptr<buffer_properties> buf_props,
                          size_t itemsize,
                          size_t read_index)
-        : buffer_sm_reader(buffer, itemsize, buf_props, read_index)
+        : buffer_reader(buffer, buf_props, itemsize, read_index)
     {
         _buffer_triton = buffer;
         // gr::configure_default_loggers(d_logger, d_debug_logger, "buffer_triton");
     }
 
-    // virtual void post_read(int num_items);
-
-    virtual bool input_blocked_callback(size_t items_required) override
+    void post_read(int num_items)
     {
-        // Only singly mapped buffers need to do anything with this callback
-        // std::scoped_lock guard(*(_buffer->mutex()));
-        std::lock_guard<std::mutex> guard(*(_buffer->mutex()));
+        std::scoped_lock guard(_rdr_mutex);
 
-        auto items_avail = items_available();
-
-        // Maybe adjust read pointers from min read index?
-        // This would mean that *all* readers must be > (passed) the write index
-        if (items_avail < items_required && _buffer->write_index() < read_index()) {
-            // GR_LOG_DEBUG(d_debug_logger, "Calling adjust_buffer_data ");
-            return _buffer_sm->adjust_buffer_data(std::memcpy, std::memmove);
+        // advance the read pointer
+        _read_index += num_items * _itemsize; // _buffer->item_size();
+        if (_read_index >= _buffer->buf_size()) {
+            _read_index -= _buffer->buf_size();
         }
-
-        return false;
+        _total_read += num_items;
     }
 };
 
@@ -97,7 +114,8 @@ class buffer_triton_properties : public buffer_properties
 {
 public:
     // using std::shared_ptr<buffer_properties> = sptr;
-    buffer_triton_properties(const std::string& triton_url_, buffer_triton_type buffer_type_)
+    buffer_triton_properties(const std::string& triton_url_,
+                             buffer_triton_type buffer_type_)
         : buffer_properties(), _triton_url(triton_url_), _buffer_type(buffer_type_)
     {
         _bff = buffer_triton::make;
