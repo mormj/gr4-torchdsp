@@ -253,6 +253,12 @@ graph_executor::run_one_iteration(std::vector<block_sptr> blocks)
 
                     break;
                 }
+                else
+                {
+                    // work returned insufficient or some such
+                    status = executor_iteration_status_t::BLKD_IN;
+                    return status;
+                }
             }
         }
 

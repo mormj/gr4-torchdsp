@@ -323,24 +323,27 @@ void triton_model_impl::infer_batch_zerocopy(
 
     std::vector<tc::InferInput*> inputs;
     int idx = 0;
+    size_t nitems = 1;
     for (const auto& input_ptr : input_ptrs_) {
         // We have to modify the shape of the input
         std::vector<int64_t> new_shape;
-        size_t nitems = 1;
         for (const auto& dim : input_ptr->Shape()) {
             new_shape.push_back(dim);
-            nitems *= dim;
         }
         new_shape[0] = batch_size; // We just override the first dimension.
+        for (const auto& dim : new_shape) {
+            nitems *= dim;
+        }
         input_ptr->SetShape(new_shape);
+
+        size_t size_bytes = nitems * in_buffers[idx]->item_size();
 
         // void * start_of_buffer = in_buffers[idx]->read_ptr() -
         // in_buffers[idx]->read_index();
         size_t offset = in_buffers[idx]->read_index();
         input_ptr->SetSharedMemory(in_buffers[idx]->shm_key(),
-                                   nitems *
-                                       in_buffers[idx]->item_size(),
-                                   offset);
+                                   size_bytes,
+                                   offset / 8);
         inputs.push_back(input_ptr.get());
         idx++;
     }
@@ -351,11 +354,11 @@ void triton_model_impl::infer_batch_zerocopy(
         // void * start_of_buffer = out_buffers[idx]->write_ptr() -
         // out_buffers[idx]->write_index();
         size_t offset = out_buffers[idx]->write_index();
+        size_t size_bytes = nitems * out_buffers[idx]->item_size();
         // std::cout << "infer: " << out_buffers[idx]->shm_key() << std::endl;
         output_ptr->SetSharedMemory(out_buffers[idx]->shm_key(),
-                                    out_buffers[idx]->space_available() *
-                                        out_buffers[idx]->item_size(),
-                                    offset);
+                                    size_bytes,
+                                    offset / 8);
         outputs.push_back(output_ptr.get());
         idx++;
     }
@@ -369,6 +372,7 @@ void triton_model_impl::infer_batch_zerocopy(
         }
     }
     else {
+        // options_.client_timeout_ = 300000;
         tc::Error err = client_->AsyncInfer(cb,
             options_,
             inputs,

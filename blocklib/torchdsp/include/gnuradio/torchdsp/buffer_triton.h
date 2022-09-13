@@ -75,6 +75,28 @@ public:
     }
 
     std::string& shm_key() { return _shm_key; }
+
+    size_t space_available() override
+    {
+
+        // Find the max number of bytes available across readers
+        uint64_t n_available = 0;
+        for (auto& r : _readers) {
+            auto n = r->bytes_available();
+            if (n > n_available) {
+                n_available = n;
+            }
+        }
+
+        int space_in_items = (_num_items * _item_size - n_available) / _item_size;
+
+        if (space_in_items < 0)
+            space_in_items = 0;
+        space_in_items = std::min(space_in_items,
+                                  (int)(_num_items / 2)); // move to a max_fill parameter
+
+        return space_in_items;
+    }
 };
 
 class buffer_triton_reader : public buffer_reader
@@ -107,6 +129,22 @@ public:
             _read_index -= _buffer->buf_size();
         }
         _total_read += num_items;
+    }
+
+    size_t bytes_available() override
+    {
+        size_t w = _buffer->write_index();
+        size_t r = _read_index;
+
+        if (w < r)
+            w += _buffer->buf_size();
+
+        if (w == r && _buffer->total_written() > _total_read )
+        {
+            return _buffer->buf_size();
+        }
+
+        return (w - r);
     }
 };
 

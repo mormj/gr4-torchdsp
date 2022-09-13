@@ -15,15 +15,16 @@ from gnuradio import gr
 from gnuradio import streamops
 from gnuradio import torchdsp
 from matplotlib import pyplot as plt
+import numpy as np
 
 from gnuradio.schedulers.nbt import scheduler_nbt as nbt
 from gnuradio.schedulers.triton import scheduler_triton as tsched
 
 
 def snipfcn_snippet_0(fg, rt=None):
-    plt.plot(fg.snk.data())
+    plt.plot(np.real(fg.snk.data()))
+    plt.plot(np.imag(fg.snk.data()))
     plt.show()
-
 
 def snippets_main_after_stop(fg, rt=None):
     snipfcn_snippet_0(fg, rt)
@@ -43,13 +44,13 @@ class untitled(gr.flowgraph):
         ##################################################
         # Blocks
         ##################################################
-        nblocks = 2
+        nblocks = 1
         # Setting the async flag to true will require the async triton scheduler
         # blk = torchdsp.triton_block(2, 1, "add_cpu_openvino", True, 'localhost:8000', [], [])
         
         hd = streamops.head( nitems,0, impl=streamops.head.cpu)
         self.snk = snk = blocks.vector_sink_c( 1,nitems, impl=blocks.vector_sink_c.cpu)
-        src1 = analog.sig_source_c( samp_rate,analog.waveform_t.COS,1234,1.0,0,0, impl=analog.sig_source_c.cpu)
+        src1 = analog.sig_source_c( samp_rate,analog.waveform_t.COS,8421,1.0,0,0, impl=analog.sig_source_c.cpu)
         # src2 = analog.sig_source_f( samp_rate,analog.waveform_t.COS,1000,1.0,0,0, impl=analog.sig_source_f.cpu)
 
 

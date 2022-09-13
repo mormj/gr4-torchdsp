@@ -54,9 +54,10 @@ buffer_triton::buffer_triton(size_t num_items,
     _shm_key = std::to_string(nodeid_generator::get_id()) + std::string("gr_") + nodeid_generator::get_unique_string();
     _buffer_size = num_items * item_size;
 
-    tc::Error error = tc::CreateSharedMemoryRegion(std::string("/")+_shm_key, _buffer_size*2, &shm_fd_ip);
-    tc::MapSharedMemory(shm_fd_ip, 0, _buffer_size*2, (void**)&_shared_memory);
+    tc::Error error = tc::CreateSharedMemoryRegion(std::string("/")+_shm_key, _buffer_size*4, &shm_fd_ip);
+    tc::MapSharedMemory(shm_fd_ip, 0, _buffer_size*4, (void**)&_shared_memory);
     _buffer = (uint8_t *)_shared_memory;
+    std::cout << "buffer: " << _name << _buffer << std::endl;
     tc::CloseSharedMemory(shm_fd_ip);
     if (!error.IsOk()) {
         throw std::runtime_error("Unable to create Triton Shared Memory Segment");

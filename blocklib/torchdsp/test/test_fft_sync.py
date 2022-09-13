@@ -45,7 +45,7 @@ class untitled(gr.flowgraph):
         ##################################################
         # Blocks
         ##################################################
-        nblocks = 1
+        nblocks = 2
         # Setting the async flag to true will require the async triton scheduler
         # blk = torchdsp.triton_block(2, 1, "add_cpu_openvino", True, 'localhost:8000', [], [])
         
